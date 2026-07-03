@@ -316,7 +316,7 @@
 
   <main id="view"></main>
 
-  <footer class="foot">Alle data gemmes kun lokalt i din browser — del filen, ikke dine tal. · Provisionsberegner v1.0</footer>
+  <footer class="foot">Alle data gemmes kun lokalt i din browser — del linket, ikke dine tal. · Provisionsberegner v1.1</footer>
 </div>
 <div id="toast" role="status"></div>
 
@@ -330,7 +330,7 @@ const MONTHS_DA = ['januar','februar','marts','april','maj','juni','juli','augus
 
 function defaultState(){
   return {
-    settings: { name:'', startDate:'', satsMode:'auto', manualSats:50, theme:null, lastCurrency:'DKK', autoBackup:true, lastAutoBackup:'' },
+    settings: { name:'', startDate:'', satsMode:'auto', manualSats:50, theme:null, lastCurrency:'DKK', autoBackup:true, lastAutoBackup:'', driveBackup:false, lastDriveBackup:'', driveFileId:'', driveNeedsAuth:false },
     clients: [],
     sales: []
   };
@@ -540,6 +540,90 @@ function dailyBackup(){
     state.settings.lastAutoBackup = today;
     save();
     downloadBackup(false);
+  }
+  // 3) Google Drive-backup (hvis konsulenten har slået det til)
+  if(GDRIVE_CLIENT_ID && state.settings.driveBackup && state.settings.lastDriveBackup !== today){
+    driveBackupNow(false).then(ok=>{
+      if(ok) toast('Dagens backup er gemt på din Google Drive ✓');
+      if(ui.tab === 'settings') render();
+    });
+  }
+}
+
+/* ---- Google Drive-backup (valgfrit — hver konsulent forbinder sit eget drev) ---- */
+const GDRIVE_CLIENT_ID = ''; // OAuth Client ID fra Google Cloud — tom streng skjuler funktionen
+const GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const GDRIVE_FILENAME = 'provisionsberegner-backup.json';
+let gisPromise = null, driveToken = null;
+
+function loadGIS(){
+  if(window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
+  if(gisPromise) return gisPromise;
+  gisPromise = new Promise((resolve, reject)=>{
+    const sc = document.createElement('script');
+    sc.src = 'https://accounts.google.com/gsi/client';
+    sc.onload = resolve;
+    sc.onerror = ()=>{ gisPromise = null; reject(new Error('Kunne ikke hente Google-scriptet')); };
+    document.head.appendChild(sc);
+  });
+  return gisPromise;
+}
+function getDriveToken(interactive){
+  if(driveToken && Date.now() < driveToken.exp - 60000) return Promise.resolve(driveToken.token);
+  return loadGIS().then(()=> new Promise((resolve, reject)=>{
+    const tc = google.accounts.oauth2.initTokenClient({
+      client_id: GDRIVE_CLIENT_ID,
+      scope: GDRIVE_SCOPE,
+      callback: resp => {
+        if(resp && resp.access_token){
+          driveToken = { token: resp.access_token, exp: Date.now() + (Number(resp.expires_in)||3600)*1000 };
+          resolve(driveToken.token);
+        }else reject(new Error((resp && resp.error) || 'Ingen adgang'));
+      },
+      error_callback: err => reject(new Error((err && err.type) || 'Login afbrudt'))
+    });
+    tc.requestAccessToken({ prompt: interactive ? 'consent' : '' });
+  }));
+}
+async function driveUpload(token){
+  const content = JSON.stringify(state, null, 2);
+  const auth = { 'Authorization': 'Bearer ' + token };
+  let fileId = state.settings.driveFileId || '';
+  if(!fileId){
+    // Genfind en tidligere backup-fil, hvis den findes (fx efter skift af computer)
+    const q = encodeURIComponent("name='"+GDRIVE_FILENAME+"' and trashed=false");
+    const found = await fetch('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)', {headers: auth})
+      .then(r=> r.ok ? r.json() : {files:[]}).catch(()=>({files:[]}));
+    if(found.files && found.files.length) fileId = found.files[0].id;
+  }
+  if(fileId){
+    const r = await fetch('https://www.googleapis.com/upload/drive/v3/files/'+fileId+'?uploadType=media', {
+      method:'PATCH', headers: Object.assign({'Content-Type':'application/json'}, auth), body: content });
+    if(r.ok){ state.settings.driveFileId = fileId; save(); return; }
+    if(r.status !== 404) throw new Error('Drive-fejl '+r.status);
+    fileId = ''; // filen er slettet på Drive — opret en ny
+  }
+  const meta = JSON.stringify({ name: GDRIVE_FILENAME, mimeType: 'application/json' });
+  const b = 'pbmb' + Date.now();
+  const body = '--'+b+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+meta+
+    '\r\n--'+b+'\r\nContent-Type: application/json\r\n\r\n'+content+'\r\n--'+b+'--';
+  const r2 = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method:'POST', headers: Object.assign({'Content-Type':'multipart/related; boundary='+b}, auth), body });
+  if(!r2.ok) throw new Error('Drive-fejl '+r2.status);
+  const j = await r2.json();
+  state.settings.driveFileId = j.id; save();
+}
+async function driveBackupNow(interactive){
+  try{
+    const token = await getDriveToken(interactive);
+    await driveUpload(token);
+    state.settings.lastDriveBackup = todayISO();
+    state.settings.driveNeedsAuth = false;
+    save();
+    return true;
+  }catch(e){
+    if(!interactive){ state.settings.driveNeedsAuth = true; save(); }
+    return false;
   }
 }
 
@@ -1063,7 +1147,16 @@ function renderSettings(){
   const snapKeys = Object.keys(snaps).sort().reverse();
   html += '<div class="card"><h2>Backup &amp; data</h2>'+
     '<p class="sub">Alt gemmes kun lokalt i denne browser. Beregneren tager selv en daglig backup: en intern kopi i browseren (seneste 7 dage) og en backup-fil, der hentes automatisk første gang du åbner den en ny dag.</p>'+
-    '<label class="checkline" style="margin-bottom:16px"><input type="checkbox" id="s-autobk" '+(s.autoBackup!==false?'checked':'')+'> Hent automatisk en backup-fil én gang om dagen</label>'+
+    '<label class="checkline" style="margin-bottom:10px"><input type="checkbox" id="s-autobk" '+(s.autoBackup!==false?'checked':'')+'> Hent automatisk en backup-fil én gang om dagen</label>'+
+    (GDRIVE_CLIENT_ID ?
+      '<label class="checkline" style="margin-bottom:6px"><input type="checkbox" id="s-drivebk" '+(s.driveBackup?'checked':'')+'> Gem dagligt en backup på min Google Drive</label>'+
+      (s.driveBackup ?
+        (s.driveNeedsAuth
+          ? '<div class="inline-note" style="color:var(--gold);margin:0 0 8px 24px">Forbindelsen til Google Drive skal fornys. <button class="btn small" id="s-drive-renew" style="margin-left:6px">Forny forbindelsen</button></div>'
+          : '<div class="inline-note" style="margin:0 0 8px 24px">Forbundet ✓ · Seneste Drive-backup: '+(s.lastDriveBackup ? fmtDate(s.lastDriveBackup) : '–')+' · Filen hedder “'+GDRIVE_FILENAME+'” på dit drev.</div>')
+        : '<div class="inline-note" style="margin:0 0 8px 24px">Backuppen gemmes på din egen Google Drive — kollegaer forbinder deres eget drev og ser aldrig dine data.</div>')+
+      '<div style="margin-bottom:10px"></div>'
+      : '')+
     '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
       '<button class="btn" id="s-export">'+iconDownload()+' Eksportér sikkerhedskopi</button>'+
       '<button class="btn" id="s-import">'+iconUpload()+' Importér sikkerhedskopi</button>'+
@@ -1080,8 +1173,8 @@ function renderSettings(){
       : '')+
     '</div>';
 
-  html += '<div class="card"><h2>Gem som bogmærke</h2>'+
-    '<p class="sub">Åbn HTML-filen direkte i din browser (dobbeltklik på filen) og tryk <b>Cmd+D</b> (Mac) eller <b>Ctrl+D</b> (Windows) for at gemme den som bogmærke. Dine data er knyttet til filens placering og den browser, du bruger — så lad filen ligge samme sted, og brug samme browser hver gang. Del gerne en kopi af filen med kollegaer: de starter med en tom beregner og ser aldrig dine tal.</p></div>';
+  html += '<div class="card"><h2>Gem som bogmærke &amp; del med kollegaer</h2>'+
+    '<p class="sub">Tryk <b>Cmd+D</b> (Mac) eller <b>Ctrl+D</b> (Windows) for at gemme denne side som bogmærke. Del blot adressen med kollegaer — alle får deres egen private beregner: dine tal gemmes kun i din egen browser og deles aldrig via linket. Brug samme browser hver gang, så dine data følger med.</p></div>';
 
   view.innerHTML = html;
 
@@ -1089,6 +1182,26 @@ function renderSettings(){
     s.autoBackup = e.target.checked;
     save();
     toast(s.autoBackup ? 'Daglig backup-fil slået til ✓' : 'Daglig backup-fil slået fra');
+  });
+  const drivebk = document.getElementById('s-drivebk');
+  if(drivebk) drivebk.addEventListener('change', async e=>{
+    if(e.target.checked){
+      s.driveBackup = true; save();
+      toast('Google beder dig nu om at godkende adgangen …');
+      const ok = await driveBackupNow(true);
+      if(ok){ toast('Google Drive er forbundet — backup gemt ✓'); }
+      else{ s.driveBackup = false; save(); toast('Kunne ikke forbinde til Google Drive — prøv igen'); }
+    }else{
+      s.driveBackup = false; s.driveNeedsAuth = false; save();
+      toast('Google Drive-backup slået fra');
+    }
+    render();
+  });
+  const driveRenew = document.getElementById('s-drive-renew');
+  if(driveRenew) driveRenew.addEventListener('click', async ()=>{
+    const ok = await driveBackupNow(true);
+    toast(ok ? 'Forbindelsen er fornyet — backup gemt ✓' : 'Kunne ikke forny forbindelsen');
+    render();
   });
   const restoreBtn = document.getElementById('s-restore');
   if(restoreBtn) restoreBtn.addEventListener('click', ()=>{
