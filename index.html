@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Provisionsberegner</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="%230e7568"/><stop offset="1" stop-color="%23d9aa4f"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(%23g)"/><text x="32" y="44" font-family="Arial" font-size="34" font-weight="bold" fill="white" text-anchor="middle">%25</text></svg>'>
+<script>
+(function(){
+  try{
+    var t = (JSON.parse(localStorage.getItem('provisionsberegner-v1'))||{}).settings;
+    t = t && t.theme;
+    document.documentElement.dataset.theme = t || (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  }catch(e){ document.documentElement.dataset.theme = 'light'; }
+})();
+</script>
+<style>
+  :root{
+    --radius: 14px;
+    --radius-sm: 9px;
+  }
+  html[data-theme="light"]{
+    --bg: #f4f3ef;
+    --bg-soft: #eceae4;
+    --card: #ffffff;
+    --card-2: #faf9f6;
+    --border: #e2dfd7;
+    --border-strong: #cfcbc0;
+    --text: #1d1b17;
+    --muted: #6f6a5f;
+    --accent: #0e7568;
+    --accent-soft: #e0f0ed;
+    --accent-text: #0b5d53;
+    --gold: #9a6b15;
+    --gold-soft: #f5ead2;
+    --danger: #b3362b;
+    --danger-soft: #f8e5e2;
+    --shadow: 0 1px 2px rgba(29,27,23,.05), 0 8px 24px -12px rgba(29,27,23,.18);
+    --shadow-lg: 0 2px 6px rgba(29,27,23,.06), 0 20px 50px -20px rgba(29,27,23,.28);
+  }
+  html[data-theme="dark"]{
+    --bg: #0f1315;
+    --bg-soft: #141a1d;
+    --card: #171e22;
+    --card-2: #1b2428;
+    --border: #263136;
+    --border-strong: #34424a;
+    --text: #e8e6df;
+    --muted: #96a09f;
+    --accent: #34c4b2;
+    --accent-soft: #12312e;
+    --accent-text: #5fd6c6;
+    --gold: #d9aa4f;
+    --gold-soft: #33290f;
+    --danger: #e06055;
+    --danger-soft: #3a1c19;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    --shadow-lg: 0 2px 6px rgba(0,0,0,.35), 0 20px 50px -20px rgba(0,0,0,.6);
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app{ max-width: 980px; margin: 0 auto; padding: 28px 20px 60px; }
+
+  /* ---------- Header ---------- */
+  header{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom: 22px; }
+  .brand{ display:flex; align-items:center; gap:13px; }
+  .brand-mark{
+    width: 42px; height: 42px; border-radius: 12px; flex: none;
+    background: linear-gradient(135deg, var(--accent), var(--gold));
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-weight: 800; font-size: 17px; letter-spacing:.5px;
+    box-shadow: var(--shadow);
+  }
+  .brand h1{ font-size: 19px; margin: 0; font-weight: 750; letter-spacing:-.2px; }
+  .brand p{ margin: 0; font-size: 12.5px; color: var(--muted); }
+  .header-right{ display:flex; align-items:center; gap:10px; }
+  .who{ font-size: 13px; color: var(--muted); text-align:right; max-width: 220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .who b{ color: var(--text); font-weight: 650; }
+
+  /* ---------- Tabs ---------- */
+  .tabs{
+    display:flex; gap:4px; padding:4px; margin-bottom: 22px;
+    background: var(--bg-soft); border:1px solid var(--border); border-radius: 12px;
+    overflow-x:auto;
+  }
+  .tabs button{
+    flex:1; border:0; background:transparent; color:var(--muted);
+    padding: 9px 14px; border-radius: 9px; font: inherit; font-weight:600; font-size:13.5px;
+    cursor:pointer; white-space:nowrap; transition: all .15s;
+  }
+  .tabs button:hover{ color: var(--text); }
+  .tabs button.active{ background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+
+  /* ---------- Cards & generics ---------- */
+  .card{
+    background: var(--card); border:1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; box-shadow: var(--shadow);
+  }
+  .card + .card{ margin-top: 16px; }
+  h2{ font-size: 16px; margin: 0 0 4px; font-weight: 700; letter-spacing:-.2px; }
+  .sub{ font-size: 13px; color: var(--muted); margin: 0 0 16px; }
+  label{ display:block; font-size: 12.5px; font-weight: 650; color: var(--muted); margin-bottom: 5px; letter-spacing:.2px; }
+  input[type=text], input[type=date], input[type=number], select, textarea{
+    width:100%; padding: 9px 11px; border-radius: var(--radius-sm);
+    border:1px solid var(--border-strong); background: var(--card-2); color: var(--text);
+    font: inherit; font-size: 14px; outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus, select:focus, textarea:focus{ border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  textarea{ resize: vertical; min-height: 64px; }
+  .field{ margin-bottom: 14px; }
+  .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid3{ display:grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+  @media (max-width: 640px){ .grid2, .grid3{ grid-template-columns: 1fr; } }
+
+  .btn{
+    display:inline-flex; align-items:center; gap:7px;
+    border:1px solid var(--border-strong); background: var(--card); color: var(--text);
+    padding: 9px 16px; border-radius: 10px; font: inherit; font-weight: 650; font-size: 13.5px;
+    cursor: pointer; transition: all .15s; box-shadow: var(--shadow);
+  }
+  .btn:hover{ border-color: var(--accent); color: var(--accent-text); }
+  .btn.primary{ background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover{ filter: brightness(1.08); color:#fff; }
+  .btn.danger{ color: var(--danger); }
+  .btn.danger:hover{ border-color: var(--danger); background: var(--danger-soft); }
+  .btn.small{ padding: 6px 11px; font-size: 12.5px; box-shadow:none; }
+  .btn:disabled{ opacity:.5; cursor: not-allowed; }
+  .iconbtn{
+    border:0; background:transparent; color: var(--muted); cursor:pointer; padding:7px;
+    border-radius: 8px; display:inline-flex; transition: all .15s;
+  }
+  .iconbtn:hover{ background: var(--bg-soft); color: var(--text); }
+  .iconbtn.danger:hover{ color: var(--danger); background: var(--danger-soft); }
+  .iconbtn svg{ width:16px; height:16px; }
+
+  .badge{
+    display:inline-block; font-size: 10.5px; font-weight: 700; letter-spacing:.4px; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 99px; vertical-align: 1px;
+  }
+  .badge.single{ background: var(--accent-soft); color: var(--accent-text); }
+  .badge.retainer{ background: var(--gold-soft); color: var(--gold); }
+
+  /* ---------- Overview ---------- */
+  .monthbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 16px; flex-wrap:wrap; }
+  .monthnav{ display:flex; align-items:center; gap: 6px; }
+  .monthnav .mlabel{ font-size: 19px; font-weight: 750; letter-spacing:-.3px; min-width: 190px; text-align:center; text-transform: capitalize; }
+  .navbtn{
+    width: 34px; height: 34px; border-radius: 9px; border:1px solid var(--border-strong);
+    background: var(--card); color: var(--text); cursor:pointer; font-size: 15px; line-height:1;
+    display:flex; align-items:center; justify-content:center; transition: all .15s; box-shadow: var(--shadow);
+  }
+  .navbtn:hover{ border-color: var(--accent); color: var(--accent-text); }
+
+  .stats{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 720px){ .stats{ grid-template-columns: 1fr; } }
+  .stat{
+    background: var(--card); border:1px solid var(--border); border-radius: var(--radius);
+    padding: 15px 17px; box-shadow: var(--shadow);
+  }
+  .stat .slabel{ font-size: 11.5px; font-weight: 700; letter-spacing:.6px; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+  .stat .sval{ font-size: 17px; font-weight: 750; letter-spacing:-.3px; }
+  .stat .sval + .sval{ margin-top: 2px; }
+  .stat .sval small{ font-size: 12px; font-weight: 600; color: var(--muted); margin-left: 5px; }
+  .stat.estimate{ border-color: var(--accent); background: linear-gradient(180deg, var(--accent-soft), var(--card) 90%); }
+  .stat.estimate .sval{ color: var(--accent-text); }
+  .stat .snote{ font-size: 11.5px; color: var(--muted); margin-top: 5px; }
+
+  .statusline{ display:flex; align-items:center; justify-content:space-between; gap: 10px; margin-bottom: 12px; flex-wrap:wrap; }
+  .chip{
+    display:inline-flex; align-items:center; gap:6px; font-size: 12.5px; font-weight: 650;
+    padding: 5px 12px; border-radius: 99px; border:1px solid var(--border);
+    background: var(--card);
+  }
+  .chip.ok{ color: var(--accent-text); border-color: var(--accent); background: var(--accent-soft); }
+  .chip.warn{ color: var(--gold); border-color: var(--gold); background: var(--gold-soft); }
+
+  .entry{
+    display:flex; align-items:center; gap: 14px;
+    background: var(--card); border:1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px; box-shadow: var(--shadow); transition: opacity .2s;
+  }
+  .entry + .entry{ margin-top: 10px; }
+  .entry.reported{ opacity: .62; }
+  .entry .chks{ flex:none; display:flex; gap:8px; }
+  .entry .chkwrap{ flex:none; display:flex; flex-direction:column; align-items:center; gap:3px; width: 64px; cursor:pointer; }
+  .entry .chkwrap input{ width: 19px; height: 19px; accent-color: var(--accent); cursor:pointer; }
+  .entry .chkwrap span{ font-size: 9px; font-weight:700; letter-spacing:.2px; text-transform:uppercase; color: var(--muted); white-space:nowrap; }
+  .entry-main{ flex: 1 1 auto; min-width: 0; }
+  .entry-title{ font-weight: 700; font-size: 14.5px; display:flex; align-items:center; gap: 8px; flex-wrap:wrap; }
+  .entry-sub{ font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .entry-amounts{ display:flex; gap: 22px; flex: none; text-align: right; }
+  .entry-amounts .amt{ min-width: 90px; }
+  .entry-amounts .amt .l{ display:block; font-size: 10.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color: var(--muted); }
+  .entry-amounts .amt .v{ font-size: 13.5px; font-weight: 700; white-space:nowrap; }
+  .entry-amounts .amt.est .v{ color: var(--accent-text); }
+  .entry-actions{ flex:none; display:flex; }
+  @media (max-width: 760px){
+    .entry{ flex-wrap: wrap; }
+    .entry-amounts{ width: 100%; justify-content: space-between; order: 3; padding-top: 10px; border-top: 1px dashed var(--border); }
+    .entry-amounts .amt{ text-align:left; min-width:0; }
+  }
+
+  .empty{
+    text-align:center; padding: 44px 20px; color: var(--muted);
+    border: 1.5px dashed var(--border-strong); border-radius: var(--radius); background: var(--card-2);
+  }
+  .empty .big{ font-size: 30px; margin-bottom: 8px; }
+
+  .welcome{
+    border:1px solid var(--gold); background: linear-gradient(135deg, var(--gold-soft), var(--card));
+    border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--shadow);
+  }
+  .welcome h3{ margin:0 0 6px; font-size: 15px; }
+  .welcome p{ margin:0 0 12px; font-size: 13.5px; color: var(--muted); }
+
+  /* ---------- Calc panel ---------- */
+  .formwrap{ display:grid; grid-template-columns: 1.5fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 820px){ .formwrap{ grid-template-columns: 1fr; } }
+  .calcpanel{
+    position: sticky; top: 16px;
+    background: linear-gradient(180deg, var(--accent-soft), var(--card) 120%);
+    border: 1px solid var(--accent); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow-lg);
+  }
+  .calcpanel h3{ margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--accent-text); }
+  .calcrow{ display:flex; justify-content:space-between; align-items: baseline; gap: 10px; padding: 7px 0; font-size: 13.5px; }
+  .calcrow .cl{ color: var(--muted); }
+  .calcrow .cv{ font-weight: 700; white-space: nowrap; }
+  .calcrow.sep{ border-top: 1px dashed var(--border-strong); margin-top: 4px; padding-top: 11px; }
+  .calcrow.total .cl{ color: var(--accent-text); font-weight: 700; }
+  .calcrow.total .cv{ font-size: 17px; color: var(--accent-text); }
+  .calcnote{ font-size: 11.5px; color: var(--muted); margin-top: 10px; line-height: 1.45; }
+
+  .seg{ display:flex; gap:4px; padding:4px; background: var(--bg-soft); border:1px solid var(--border); border-radius: 10px; }
+  .seg button{
+    flex:1; border:0; background:transparent; color: var(--muted); padding: 8px 10px; border-radius: 7px;
+    font: inherit; font-weight: 650; font-size: 13px; cursor: pointer; transition: all .15s;
+  }
+  .seg button.active{ background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+
+  .inline-note{ font-size: 12px; color: var(--muted); margin-top: 5px; }
+  .checkline{ display:flex; align-items:center; gap:8px; font-size: 13px; color: var(--text); cursor:pointer; user-select:none; }
+  .checkline input{ width: 16px; height: 16px; accent-color: var(--accent); cursor:pointer; }
+
+  /* ---------- Clients ---------- */
+  .client-row{
+    display:flex; align-items:center; gap: 14px; padding: 13px 16px;
+    background: var(--card); border:1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  .client-row + .client-row{ margin-top: 10px; }
+  .client-ic{
+    width: 38px; height: 38px; border-radius: 10px; flex:none;
+    background: var(--accent-soft); color: var(--accent-text);
+    display:flex; align-items:center; justify-content:center; font-weight: 800; font-size: 15px;
+  }
+  .client-main{ flex:1; min-width:0; }
+  .client-main b{ font-size: 14.5px; }
+  .client-main .m{ font-size: 12.5px; color: var(--muted); }
+
+  .satscard{
+    display:flex; align-items:center; gap: 16px; padding: 14px 16px; border-radius: var(--radius);
+    background: var(--gold-soft); border: 1px solid var(--gold); margin-bottom: 16px;
+  }
+  .satscard .big{ font-size: 26px; font-weight: 800; color: var(--gold); letter-spacing:-.5px; }
+  .satscard .m{ font-size: 12.5px; color: var(--muted); }
+
+  footer.foot{ text-align:center; color: var(--muted); font-size: 12px; margin-top: 34px; }
+
+  /* ---------- Toast ---------- */
+  #toast{
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+    background: var(--text); color: var(--bg); padding: 10px 20px; border-radius: 99px;
+    font-size: 13.5px; font-weight: 650; opacity: 0; pointer-events: none;
+    transition: all .25s; box-shadow: var(--shadow-lg); z-index: 99; max-width: 90vw;
+  }
+  #toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media print{
+    .tabs, .navbtn, .entry-actions, .iconbtn, .btn, header .header-right, .welcome, footer.foot, .entry .chkwrap input{ display:none !important; }
+    body{ background:#fff; color:#000; }
+    .card, .entry, .stat{ box-shadow:none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="brand-mark">%</div>
+      <div>
+        <h1>Provisionsberegner</h1>
+        <p>Konsulentprovision &amp; indberetning</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="who" id="who"></div>
+      <button class="iconbtn" id="themeToggle" title="Skift mellem lyst og mørkt tema" aria-label="Skift tema">
+        <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:19px;height:19px"></svg>
+      </button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="overview">Oversigt</button>
+    <button data-tab="form">Nyt salg</button>
+    <button data-tab="clients">Klienter</button>
+    <button data-tab="settings">Indstillinger</button>
+  </nav>
+
+  <main id="view"></main>
+
+  <footer class="foot">Alle data gemmes kun lokalt i din browser — del filen, ikke dine tal. · Provisionsberegner v1.0</footer>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+'use strict';
+
+/* ================= State ================= */
+const LS_KEY = 'provisionsberegner-v1';
+const CURRENCIES = ['DKK','EUR','USD','GBP','NOK','SEK','CHF'];
+const MONTHS_DA = ['januar','februar','marts','april','maj','juni','juli','august','september','oktober','november','december'];
+
+function defaultState(){
+  return {
+    settings: { name:'', startDate:'', satsMode:'auto', manualSats:50, theme:null, lastCurrency:'DKK', autoBackup:true, lastAutoBackup:'' },
+    clients: [],
+    sales: []
+  };
+}
+function normalizeSales(sales){
+  for(const sl of sales){
+    sl.reported = !!sl.reported;
+    sl.paid = !!sl.paid;
+    if(!Array.isArray(sl.reportedMonths)) sl.reportedMonths = [];
+    if(!Array.isArray(sl.paidMonths)) sl.paidMonths = [];
+  }
+  return sales;
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return defaultState();
+    const d = JSON.parse(raw);
+    const s = defaultState();
+    return {
+      settings: Object.assign(s.settings, d.settings||{}),
+      clients: Array.isArray(d.clients) ? d.clients : [],
+      sales: normalizeSales(Array.isArray(d.sales) ? d.sales : [])
+    };
+  }catch(e){ return defaultState(); }
+}
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+let state = load();
+let ui = {
+  tab: 'overview',
+  month: monthKeyOf(new Date()),
+  editingId: null,
+  editingClientId: null,
+  formType: 'single'
+};
+
+/* ================= Helpers ================= */
+function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2)); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function monthKeyOf(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1); }
+function monthKeyFromISO(iso){ return (iso||'').slice(0,7); }
+function addMonths(mk, delta){
+  let [y,m] = mk.split('-').map(Number);
+  m += delta;
+  y += Math.floor((m-1)/12); m = ((m-1)%12+12)%12 + 1;
+  return y + '-' + pad2(m);
+}
+function monthLabel(mk){
+  const [y,m] = mk.split('-').map(Number);
+  return MONTHS_DA[m-1] + ' ' + y;
+}
+function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function fmtDate(iso){
+  if(!iso) return '–';
+  const [y,m,d] = iso.split('-').map(Number);
+  return pad2(d)+'.'+pad2(m)+'.'+y;
+}
+function fmtNum(n){
+  return new Intl.NumberFormat('da-DK', {minimumFractionDigits:2, maximumFractionDigits:2}).format(n);
+}
+function fmtMoney(n, cur){
+  try{
+    return new Intl.NumberFormat('da-DK', {style:'currency', currency:cur, minimumFractionDigits:2, maximumFractionDigits:2}).format(n);
+  }catch(e){ return fmtNum(n) + ' ' + cur; }
+}
+function fmtPct(n){
+  return new Intl.NumberFormat('da-DK', {maximumFractionDigits:2}).format(n) + '%';
+}
+function round2(n){ return Math.round(n*100)/100; }
+
+function parseAmount(str){
+  if(typeof str === 'number') return str;
+  let s = String(str||'').trim().replace(/\s/g,'').replace(/kr\.?$/i,'');
+  if(!s) return NaN;
+  const hasC = s.includes(','), hasD = s.includes('.');
+  if(hasC && hasD){ s = s.replace(/\./g,'').replace(',', '.'); }
+  else if(hasC){ s = s.replace(',', '.'); }
+  else if(hasD){
+    const parts = s.split('.');
+    if(parts.length > 2 || (parts.length === 2 && parts[1].length === 3)){ s = parts.join(''); }
+  }
+  const n = Number(s);
+  return isFinite(n) && n >= 0 ? n : NaN;
+}
+
+/* ================= Domain ================= */
+function employmentYearsAt(dateISO){
+  const sd = state.settings.startDate;
+  if(!sd) return null;
+  const a = new Date(sd + 'T00:00:00');
+  const b = new Date(dateISO + 'T00:00:00');
+  if(isNaN(a) || isNaN(b)) return null;
+  let years = b.getFullYear() - a.getFullYear();
+  const anniv = new Date(a); anniv.setFullYear(a.getFullYear() + years);
+  if(b < anniv) years--;
+  return years;
+}
+function tierFromYears(years){
+  if(years == null) return null;
+  if(years < 1) return 40;
+  if(years < 2) return 50;
+  return 60;
+}
+/* Din sats på en given dato (ISO). Retainer-måneder evalueres pr. den 1. i måneden. */
+function satsAt(dateISO){
+  const s = state.settings;
+  if(s.satsMode === 'manual'){
+    const m = Number(s.manualSats);
+    return isFinite(m) && m > 0 ? m : null;
+  }
+  return tierFromYears(employmentYearsAt(dateISO));
+}
+function nextTierInfo(){
+  const s = state.settings;
+  if(s.satsMode === 'manual' || !s.startDate) return null;
+  const years = employmentYearsAt(todayISO());
+  if(years == null || years >= 2) return null;
+  const a = new Date(s.startDate + 'T00:00:00');
+  const next = new Date(a); next.setFullYear(a.getFullYear() + (years < 1 ? 1 : 2));
+  const iso = next.getFullYear()+'-'+pad2(next.getMonth()+1)+'-'+pad2(next.getDate());
+  return { date: iso, sats: years < 1 ? 50 : 60 };
+}
+
+function invoiceOf(sale){
+  if(sale.invoiceOverride != null && isFinite(sale.invoiceOverride)) return sale.invoiceOverride;
+  return round2(sale.amount * sale.nsfRate / 100);
+}
+/* Estimat for et salg i en given måned (mk bruges kun for retainere) */
+function estimateOf(sale, mk){
+  const refDate = sale.type === 'single' ? sale.date : (mk + '-01');
+  const sats = satsAt(refDate);
+  if(sats == null) return null;
+  return { sats, value: round2(invoiceOf(sale) * sats / 100) };
+}
+function entriesForMonth(mk){
+  const out = [];
+  for(const s of state.sales){
+    if(s.type === 'single'){
+      if(monthKeyFromISO(s.date) === mk) out.push({ sale:s, mk });
+    }else{
+      if(s.startMonth && s.startMonth <= mk && (!s.endMonth || mk <= s.endMonth)) out.push({ sale:s, mk });
+    }
+  }
+  out.sort((a,b)=> (a.sale.date||'').localeCompare(b.sale.date||'') || (a.sale.customer||'').localeCompare(b.sale.customer||'', 'da'));
+  return out;
+}
+function isReported(entry){
+  const s = entry.sale;
+  return s.type === 'single' ? !!s.reported : (s.reportedMonths||[]).includes(entry.mk);
+}
+function isPaid(entry){
+  const s = entry.sale;
+  return s.type === 'single' ? !!s.paid : (s.paidMonths||[]).includes(entry.mk);
+}
+function toggleReported(id, mk){
+  const s = state.sales.find(x=>x.id===id);
+  if(!s) return;
+  if(s.type === 'single'){ s.reported = !s.reported; }
+  else{
+    s.reportedMonths = s.reportedMonths || [];
+    const i = s.reportedMonths.indexOf(mk);
+    if(i >= 0) s.reportedMonths.splice(i,1); else s.reportedMonths.push(mk);
+  }
+  save(); render();
+}
+function togglePaid(id, mk){
+  const s = state.sales.find(x=>x.id===id);
+  if(!s) return;
+  if(s.type === 'single'){ s.paid = !s.paid; }
+  else{
+    s.paidMonths = s.paidMonths || [];
+    const i = s.paidMonths.indexOf(mk);
+    if(i >= 0) s.paidMonths.splice(i,1); else s.paidMonths.push(mk);
+  }
+  save(); render();
+}
+
+/* ================= Backup ================= */
+const BK_KEY = 'provisionsberegner-backups-v1';
+function readSnapshots(){
+  try{ return JSON.parse(localStorage.getItem(BK_KEY)) || {}; }catch(e){ return {}; }
+}
+function downloadBackup(manual){
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'provisionsberegner-backup-' + todayISO() + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast(manual ? 'Sikkerhedskopi hentet ✓' : 'Dagens automatiske backup er hentet til Overførsler ✓');
+}
+function dailyBackup(){
+  if(state.clients.length === 0 && state.sales.length === 0) return;
+  const today = todayISO();
+  // 1) Intern sikkerhedskopi i browseren (seneste 7 dage)
+  const snaps = readSnapshots();
+  if(!snaps[today]){
+    snaps[today] = JSON.stringify({settings: state.settings, clients: state.clients, sales: state.sales});
+    const keys = Object.keys(snaps).sort();
+    while(keys.length > 7) delete snaps[keys.shift()];
+    try{ localStorage.setItem(BK_KEY, JSON.stringify(snaps)); }catch(e){}
+  }
+  // 2) Automatisk backup-fil, første gang beregneren åbnes en ny dag
+  if(state.settings.autoBackup !== false && state.settings.lastAutoBackup !== today){
+    state.settings.lastAutoBackup = today;
+    save();
+    downloadBackup(false);
+  }
+}
+
+/* ================= Toast ================= */
+let toastTimer = null;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 2600);
+}
+
+/* ================= Theme ================= */
+function currentTheme(){ return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'; }
+function renderThemeIcon(){
+  const icon = document.getElementById('themeIcon');
+  if(currentTheme() === 'dark'){
+    icon.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+    icon.parentElement.title = 'Skift til lyst tema';
+  }else{
+    icon.innerHTML = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
+    icon.parentElement.title = 'Skift til mørkt tema';
+  }
+}
+document.getElementById('themeToggle').addEventListener('click', ()=>{
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  state.settings.theme = next;
+  save();
+  renderThemeIcon();
+});
+
+/* ================= Render: skeleton ================= */
+const view = document.getElementById('view');
+
+function render(){
+  document.querySelectorAll('#tabs button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.tab === ui.tab);
+    if(b.dataset.tab === 'form') b.textContent = ui.editingId ? 'Rediger salg' : 'Nyt salg';
+  });
+  const who = document.getElementById('who');
+  who.innerHTML = state.settings.name ? 'Konsulent: <b>'+esc(state.settings.name)+'</b>' : '';
+  if(ui.tab === 'overview') renderOverview();
+  else if(ui.tab === 'form') renderForm();
+  else if(ui.tab === 'clients') renderClients();
+  else renderSettings();
+  renderThemeIcon();
+}
+
+document.getElementById('tabs').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-tab]');
+  if(!b) return;
+  if(b.dataset.tab !== 'form') ui.editingId = null;
+  ui.tab = b.dataset.tab;
+  render();
+});
+
+/* ================= Render: Oversigt ================= */
+function renderOverview(){
+  const mk = ui.month;
+  const entries = entriesForMonth(mk);
+  const pending = entries.filter(e=>!isReported(e)).length;
+  const unpaid = entries.filter(e=>!isPaid(e)).length;
+
+  // Totals per currency
+  const totals = {}; // cur -> {order, invoice, est, estMissing}
+  for(const e of entries){
+    const s = e.sale;
+    const t = totals[s.currency] || (totals[s.currency] = {order:0, invoice:0, est:0, estMissing:false});
+    t.order += s.amount;
+    t.invoice += invoiceOf(s);
+    const est = estimateOf(s, mk);
+    if(est) t.est += est.value; else t.estMissing = true;
+  }
+  const curs = Object.keys(totals).sort();
+  const satsKnown = satsAt(mk + '-01') != null;
+
+  let html = '';
+
+  if(state.clients.length === 0){
+    html += '<div class="welcome"><h3>👋 Velkommen til din provisionsberegner</h3>'+
+      '<p>Kom godt i gang på 2 minutter: Opret først dine klienter med deres NSF-sats, og sæt din egen sats under Indstillinger. Derefter kan du registrere salg og retainere.</p>'+
+      '<button class="btn primary small" data-action="goto-clients">1. Opret klienter</button> '+
+      '<button class="btn small" data-action="goto-settings">2. Sæt din sats</button></div>';
+  }
+
+  html += '<div class="monthbar"><div class="monthnav">'+
+    '<button class="navbtn" data-action="month-prev" title="Forrige måned">‹</button>'+
+    '<div class="mlabel">'+esc(monthLabel(mk))+'</div>'+
+    '<button class="navbtn" data-action="month-next" title="Næste måned">›</button>'+
+    '<button class="btn small" data-action="month-today" style="margin-left:6px">I dag</button>'+
+    '</div>'+
+    '<button class="btn" data-action="copy-month" '+(entries.length? '':'disabled')+'>'+iconCopy()+' Kopiér månedsoversigt</button></div>';
+
+  function valLines(key){
+    if(curs.length === 0) return '<div class="sval">–</div>';
+    return curs.map(c=>{
+      const t = totals[c];
+      if(key === 'est'){
+        if(t.estMissing && t.est === 0) return '<div class="sval">–<small>'+esc(c)+'</small></div>';
+        return '<div class="sval">'+esc(fmtNum(t.est))+'<small>'+esc(c)+(t.estMissing?' *':'')+'</small></div>';
+      }
+      return '<div class="sval">'+esc(fmtNum(t[key]))+'<small>'+esc(c)+'</small></div>';
+    }).join('');
+  }
+  html += '<div class="stats">'+
+    '<div class="stat"><div class="slabel">Ordrebeløb</div>'+valLines('order')+'</div>'+
+    '<div class="stat"><div class="slabel">Fakturabeløb (NSF)</div>'+valLines('invoice')+'</div>'+
+    '<div class="stat estimate"><div class="slabel">Din estimerede provision</div>'+valLines('est')+
+      '<div class="snote">'+(satsKnown ? 'Vejledende estimat — bogholderen laver den officielle beregning.' : 'Sæt din sats under Indstillinger for at se estimat.')+'</div></div>'+
+    '</div>';
+
+  if(entries.length){
+    html += '<div class="statusline"><span class="chip '+(pending===0?'ok':'warn')+'">'+
+      (pending===0 ? '✓ Alt indberettet for '+esc(monthLabel(mk)) : pending+' salg mangler at blive indberettet')+
+      '</span><span class="chip '+(unpaid===0?'ok':'warn')+'">'+
+      (unpaid===0 ? '✓ Alt udbetalt' : unpaid+' afventer udbetaling')+
+      '</span><span class="chip">'+entries.length+' salg i måneden</span></div>';
+  }
+
+  if(entries.length === 0){
+    html += '<div class="empty"><div class="big">🗓️</div>Ingen salg i '+esc(monthLabel(mk))+'.<br>'+
+      '<button class="btn primary" style="margin-top:14px" data-action="goto-form">+ Registrér et salg</button></div>';
+  }else{
+    for(const e of entries){
+      const s = e.sale;
+      const est = estimateOf(s, mk);
+      const rep = isReported(e);
+      const paid = isPaid(e);
+      const typeBadge = s.type === 'single'
+        ? '<span class="badge single">Enkeltsalg</span>'
+        : '<span class="badge retainer">Retainer</span>';
+      const sub = s.type === 'single'
+        ? 'Solgt for '+esc(s.clientName)+' · '+fmtDate(s.date)+' · NSF-sats '+esc(fmtPct(s.nsfRate))
+        : 'Solgt for '+esc(s.clientName)+' · bekræftet '+fmtDate(s.date)+' · '+esc(monthLabel(mk))+' · NSF-sats '+esc(fmtPct(s.nsfRate))+
+          (s.endMonth ? ' · slutter '+esc(monthLabel(s.endMonth)) : ' · løbende');
+      html += '<div class="entry'+((rep&&paid)?' reported':'')+'">'+
+        '<div class="chks">'+
+        '<label class="chkwrap" title="Markér som indberettet til bogholder"><input type="checkbox" data-action="toggle-reported" data-id="'+s.id+'" data-mk="'+mk+'" '+(rep?'checked':'')+'><span>Indberettet</span></label>'+
+        '<label class="chkwrap" title="Markér når provisionen er udbetalt til dig"><input type="checkbox" data-action="toggle-paid" data-id="'+s.id+'" data-mk="'+mk+'" '+(paid?'checked':'')+'><span>Udbetalt</span></label>'+
+        '</div>'+
+        '<div class="entry-main"><div class="entry-title">'+esc(s.customer)+' '+typeBadge+'</div>'+
+        '<div class="entry-sub">'+sub+(s.description?' · '+esc(s.description):'')+'</div></div>'+
+        '<div class="entry-amounts">'+
+          '<div class="amt"><span class="l">Ordrebeløb</span><span class="v">'+esc(fmtMoney(s.amount, s.currency))+'</span></div>'+
+          '<div class="amt"><span class="l">Faktura</span><span class="v">'+esc(fmtMoney(invoiceOf(s), s.currency))+'</span></div>'+
+          '<div class="amt est"><span class="l">Estimat'+(est?' ('+esc(fmtPct(est.sats))+')':'')+'</span><span class="v">'+(est?esc(fmtMoney(est.value, s.currency)):'–')+'</span></div>'+
+        '</div>'+
+        '<div class="entry-actions">'+
+          '<button class="iconbtn" data-action="edit-sale" data-id="'+s.id+'" title="Rediger">'+iconEdit()+'</button>'+
+          '<button class="iconbtn danger" data-action="delete-sale" data-id="'+s.id+'" title="Slet">'+iconTrash()+'</button>'+
+        '</div></div>';
+    }
+  }
+  view.innerHTML = html;
+}
+
+/* ================= Copy month text ================= */
+function buildMonthText(mk){
+  const entries = entriesForMonth(mk);
+  const L = [];
+  const line = '──────────────────────────────';
+  L.push('PROVISIONSINDBERETNING · ' + monthLabel(mk).toUpperCase());
+  L.push('Konsulent: ' + (state.settings.name || '(navn ikke angivet)'));
+  L.push(line);
+  entries.forEach((e, i)=>{
+    const s = e.sale;
+    L.push((i+1) + '. ' + s.customer + '  (solgt for ' + s.clientName + ')');
+    if(s.type === 'single'){
+      L.push('   Type: Enkeltsalg');
+      L.push('   Dato for salg/bekræftelse: ' + fmtDate(s.date));
+      L.push('   Ordrebeløb: ' + fmtNum(s.amount) + ' ' + s.currency);
+    }else{
+      L.push('   Type: Retainer – ' + monthLabel(mk) + ' (bekræftet ' + fmtDate(s.date) + ')');
+      L.push('   Ordrebeløb (måned): ' + fmtNum(s.amount) + ' ' + s.currency);
+    }
+    L.push('   Fakturabeløb (NSF → klient): ' + fmtNum(invoiceOf(s)) + ' ' + s.currency);
+    if(s.description) L.push('   Beskrivelse: ' + s.description);
+    L.push('');
+  });
+  L.push(line);
+  const totals = {};
+  for(const e of entries){
+    const s = e.sale;
+    const t = totals[s.currency] || (totals[s.currency] = {order:0, invoice:0});
+    t.order += s.amount; t.invoice += invoiceOf(s);
+  }
+  for(const c of Object.keys(totals).sort()){
+    L.push('I alt ' + c + ': Ordrebeløb ' + fmtNum(totals[c].order) + ' · Fakturabeløb ' + fmtNum(totals[c].invoice));
+  }
+  return L.join('\n');
+}
+function copyText(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(text).then(()=>true).catch(()=>legacyCopy(text));
+  }
+  return Promise.resolve(legacyCopy(text));
+}
+function legacyCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try{ ok = document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+  return ok;
+}
+
+/* ================= Render: Salgsformular ================= */
+function renderForm(){
+  const editing = ui.editingId ? state.sales.find(s=>s.id===ui.editingId) : null;
+  const type = editing ? editing.type : ui.formType;
+  const now = new Date();
+  const yearNow = now.getFullYear();
+
+  if(state.clients.length === 0){
+    view.innerHTML = '<div class="card"><h2>'+(editing?'Rediger salg':'Nyt salg')+'</h2>'+
+      '<p class="sub">Du skal oprette mindst én klient, før du kan registrere salg.</p>'+
+      '<button class="btn primary" data-action="goto-clients">+ Opret din første klient</button></div>';
+    return;
+  }
+
+  function clientOptions(selectedId){
+    let opts = state.clients.map(c=>
+      '<option value="'+c.id+'" '+(c.id===selectedId?'selected':'')+'>'+esc(c.name)+' — NSF-sats '+esc(fmtPct(c.nsfRate))+'</option>'
+    ).join('');
+    if(editing && !state.clients.some(c=>c.id===editing.clientId)){
+      opts = '<option value="__snapshot" selected>'+esc(editing.clientName)+' (slettet klient) — NSF-sats '+esc(fmtPct(editing.nsfRate))+'</option>' + opts;
+    }
+    return opts;
+  }
+  function monthSelects(prefix, mk){
+    const [selY, selM] = (mk||'').split('-').map(Number);
+    let mo = '<select id="'+prefix+'-m">';
+    for(let m=1;m<=12;m++) mo += '<option value="'+m+'" '+(m===selM?'selected':'')+'>'+MONTHS_DA[m-1]+'</option>';
+    mo += '</select>';
+    let yo = '<select id="'+prefix+'-y">';
+    for(let y=yearNow-4;y<=yearNow+3;y++) yo += '<option value="'+y+'" '+(y===(selY||yearNow)?'selected':'')+'>'+y+'</option>';
+    yo += '</select>';
+    return '<div style="display:flex;gap:8px">'+mo+yo+'</div>';
+  }
+
+  const v = {
+    clientId: editing ? editing.clientId : (state.clients[0] ? state.clients[0].id : ''),
+    customer: editing ? editing.customer : '',
+    date: editing ? editing.date : todayISO(),
+    amount: editing ? String(editing.amount).replace('.',',') : '',
+    currency: editing ? editing.currency : (state.settings.lastCurrency || 'DKK'),
+    description: editing ? (editing.description||'') : '',
+    invoiceOverride: editing ? editing.invoiceOverride : null,
+    startMonth: editing && editing.startMonth ? editing.startMonth : monthKeyOf(now),
+    endMonth: editing ? editing.endMonth : null
+  };
+
+  let html = '<div class="formwrap"><div class="card">'+
+    '<h2>'+(editing?'Rediger salg':'Nyt salg')+'</h2>'+
+    '<p class="sub">'+(type==='retainer'?'En retainer giver provision hver måned, så længe aftalen løber.':'Et enkeltsalg giver provision én gang, i salgsmåneden.')+'</p>'+
+
+    '<div class="field"><label>Salgstype</label><div class="seg" id="typeSeg">'+
+      '<button type="button" data-type="single" class="'+(type==='single'?'active':'')+'">Enkeltsalg</button>'+
+      '<button type="button" data-type="retainer" class="'+(type==='retainer'?'active':'')+'">Retainer</button>'+
+    '</div></div>'+
+
+    '<div class="field"><label for="f-client">Klient (solgt for)</label>'+
+      '<select id="f-client">'+clientOptions(v.clientId)+'</select></div>'+
+
+    '<div class="field"><label for="f-customer">Kunde (solgt til)</label>'+
+      '<input type="text" id="f-customer" placeholder="Fx Nordisk Byg ApS" value="'+esc(v.customer)+'"></div>'+
+
+    '<div class="grid2">'+
+      '<div class="field"><label for="f-date">Dato for salg/bekræftelse</label>'+
+        '<input type="date" id="f-date" value="'+esc(v.date)+'"></div>'+
+      '<div class="field"><label for="f-currency">Valuta</label><select id="f-currency">'+
+        CURRENCIES.map(c=>'<option '+(c===v.currency?'selected':'')+'>'+c+'</option>').join('')+
+      '</select></div>'+
+    '</div>';
+
+  if(type === 'retainer'){
+    html += '<div class="grid2">'+
+      '<div class="field"><label>Første provisionsmåned</label>'+monthSelects('f-start', v.startMonth)+'</div>'+
+      '<div class="field"><label>Slutmåned</label>'+
+        '<label class="checkline" style="margin:8px 0 10px"><input type="checkbox" id="f-hasend" '+(v.endMonth?'checked':'')+'> Aftalen har en slutmåned</label>'+
+        '<div id="f-end-wrap" style="display:'+(v.endMonth?'block':'none')+'">'+monthSelects('f-end', v.endMonth||monthKeyOf(now))+'</div>'+
+      '</div></div>';
+  }
+
+  html += '<div class="field"><label for="f-amount">'+(type==='retainer'?'Månedligt ordrebeløb':'Ordrebeløb')+'</label>'+
+      '<input type="text" inputmode="decimal" id="f-amount" placeholder="Fx 100.000,00" value="'+esc(v.amount)+'">'+
+      '<div class="inline-note">Det beløb din klient fakturerer kunden'+(type==='retainer'?' pr. måned':'')+'.</div></div>'+
+
+    '<div class="field"><label class="checkline"><input type="checkbox" id="f-inv-manual" '+(v.invoiceOverride!=null?'checked':'')+'> Ret fakturabeløbet manuelt</label>'+
+      '<div id="f-inv-wrap" style="display:'+(v.invoiceOverride!=null?'block':'none')+';margin-top:8px">'+
+      '<input type="text" inputmode="decimal" id="f-invoice" placeholder="Fakturabeløb" value="'+(v.invoiceOverride!=null?esc(String(v.invoiceOverride).replace('.',',')):'')+'">'+
+      '<div class="inline-note">Brug kun hvis NSF’s faktura afviger fra standard-satsen.</div></div></div>'+
+
+    '<div class="field"><label for="f-desc">Beskrivelse (frivillig)</label>'+
+      '<textarea id="f-desc" placeholder="Fx aftaledetaljer til bogholderen">'+esc(v.description)+'</textarea></div>'+
+
+    '<div style="display:flex;gap:10px;margin-top:18px">'+
+      '<button class="btn primary" id="f-save">'+(editing?'Gem ændringer':'Gem salg')+'</button>'+
+      '<button class="btn" id="f-cancel">Annullér</button>'+
+    '</div>'+
+  '</div>';
+
+  html += '<div class="calcpanel" id="calcpanel"></div></div>';
+  view.innerHTML = html;
+
+  /* --- form wiring --- */
+  document.getElementById('typeSeg').addEventListener('click', e=>{
+    const b = e.target.closest('button[data-type]');
+    if(!b) return;
+    ui.formType = b.dataset.type;
+    if(editing) editing.type = editing.type; // typen kan ikke ændres ved redigering af gemte data-felter — men vi tillader det:
+    if(ui.editingId){
+      const s = state.sales.find(x=>x.id===ui.editingId);
+      if(s && s.type !== b.dataset.type){
+        s.type = b.dataset.type;
+        if(s.type === 'retainer'){ s.startMonth = s.startMonth || monthKeyFromISO(s.date); s.reportedMonths = s.reportedMonths || []; }
+      }
+    }
+    renderForm();
+  });
+
+  const hasEnd = document.getElementById('f-hasend');
+  if(hasEnd){
+    hasEnd.addEventListener('change', ()=>{
+      document.getElementById('f-end-wrap').style.display = hasEnd.checked ? 'block' : 'none';
+      updateCalc();
+    });
+  }
+  const invManual = document.getElementById('f-inv-manual');
+  invManual.addEventListener('change', ()=>{
+    document.getElementById('f-inv-wrap').style.display = invManual.checked ? 'block' : 'none';
+    updateCalc();
+  });
+
+  ['f-client','f-customer','f-date','f-currency','f-amount','f-invoice','f-desc','f-start-m','f-start-y','f-end-m','f-end-y'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.addEventListener('input', updateCalc); el.addEventListener('change', updateCalc); }
+  });
+
+  function readForm(){
+    const clientSel = document.getElementById('f-client').value;
+    let client = null, clientName = '', nsfRate = NaN;
+    if(clientSel === '__snapshot' && editing){
+      clientName = editing.clientName; nsfRate = editing.nsfRate;
+    }else{
+      client = state.clients.find(c=>c.id===clientSel);
+      if(client){ clientName = client.name; nsfRate = client.nsfRate; }
+    }
+    const amount = parseAmount(document.getElementById('f-amount').value);
+    const manual = document.getElementById('f-inv-manual').checked;
+    const invRaw = manual ? parseAmount(document.getElementById('f-invoice').value) : NaN;
+    const r = {
+      clientId: clientSel, clientName, nsfRate,
+      customer: document.getElementById('f-customer').value.trim(),
+      date: document.getElementById('f-date').value,
+      currency: document.getElementById('f-currency').value,
+      amount,
+      invoiceOverride: manual && isFinite(invRaw) ? round2(invRaw) : null,
+      description: document.getElementById('f-desc').value.trim(),
+      type
+    };
+    if(type === 'retainer'){
+      r.startMonth = document.getElementById('f-start-y').value + '-' + pad2(document.getElementById('f-start-m').value);
+      r.endMonth = document.getElementById('f-hasend').checked
+        ? document.getElementById('f-end-y').value + '-' + pad2(document.getElementById('f-end-m').value)
+        : null;
+    }
+    return r;
+  }
+
+  function updateCalc(){
+    const r = readForm();
+    const panel = document.getElementById('calcpanel');
+    const ok = isFinite(r.amount) && r.amount > 0 && isFinite(r.nsfRate);
+    const invoice = ok ? (r.invoiceOverride != null ? r.invoiceOverride : round2(r.amount * r.nsfRate / 100)) : null;
+    const refDate = type === 'single' ? (r.date || todayISO()) : ((r.startMonth || monthKeyOf(new Date())) + '-01');
+    const sats = satsAt(refDate);
+    const est = (invoice != null && sats != null) ? round2(invoice * sats / 100) : null;
+    const per = type === 'retainer' ? ' / md.' : '';
+    let h = '<h3>Beregning</h3>';
+    h += '<div class="calcrow"><span class="cl">Ordrebeløb'+(type==='retainer'?' pr. måned':'')+'</span><span class="cv">'+(ok?esc(fmtMoney(r.amount, r.currency)):'–')+'</span></div>';
+    h += '<div class="calcrow"><span class="cl">NSF-sats ('+esc(r.clientName||'klient')+')</span><span class="cv">'+(isFinite(r.nsfRate)?esc(fmtPct(r.nsfRate)):'–')+'</span></div>';
+    h += '<div class="calcrow sep"><span class="cl">Fakturabeløb (NSF)'+(r.invoiceOverride!=null?' · manuelt':'')+'</span><span class="cv">'+(invoice!=null?esc(fmtMoney(invoice, r.currency))+per:'–')+'</span></div>';
+    h += '<div class="calcrow"><span class="cl">Din sats</span><span class="cv">'+(sats!=null?esc(fmtPct(sats)):'ikke sat')+'</span></div>';
+    h += '<div class="calcrow total"><span class="cl">Estimeret provision</span><span class="cv">'+(est!=null?esc(fmtMoney(est, r.currency))+per:'–')+'</span></div>';
+    if(type === 'retainer' && r.endMonth && r.startMonth && r.endMonth >= r.startMonth && est != null){
+      const [sy,sm] = r.startMonth.split('-').map(Number);
+      const [ey,em] = r.endMonth.split('-').map(Number);
+      const months = (ey-sy)*12 + (em-sm) + 1;
+      h += '<div class="calcrow"><span class="cl">Hele perioden ('+months+' mdr.)</span><span class="cv">'+esc(fmtMoney(round2(est*months), r.currency))+'</span></div>';
+    }
+    h += '<div class="calcnote">'+(sats==null
+      ? 'Angiv din ansættelsesdato eller sats under Indstillinger for at se dit estimat.'
+      : 'Estimatet er vejledende — den officielle provisionsberegning laves af bogholderen.')+'</div>';
+    panel.innerHTML = h;
+  }
+
+  document.getElementById('f-save').addEventListener('click', ()=>{
+    const r = readForm();
+    if(!r.clientName){ toast('Vælg en klient'); return; }
+    if(!r.customer){ toast('Angiv hvilken kunde der er solgt til'); return; }
+    if(!r.date){ toast('Angiv dato for salget/bekræftelsen'); return; }
+    if(!isFinite(r.amount) || r.amount <= 0){ toast('Angiv et gyldigt ordrebeløb'); return; }
+    if(type === 'retainer' && r.endMonth && r.endMonth < r.startMonth){ toast('Slutmåneden ligger før første måned'); return; }
+
+    state.settings.lastCurrency = r.currency;
+    if(editing){
+      Object.assign(editing, r);
+      if(editing.type === 'single'){ delete editing.startMonth; delete editing.endMonth; }
+      toast('Salget er opdateret ✓');
+      ui.month = editing.type === 'single' ? monthKeyFromISO(editing.date) : editing.startMonth;
+    }else{
+      const sale = Object.assign({ id: uid(), reported:false, reportedMonths:[] }, r);
+      state.sales.push(sale);
+      toast(type === 'retainer' ? 'Retaineren er gemt ✓' : 'Salget er gemt ✓');
+      ui.month = type === 'single' ? monthKeyFromISO(r.date) : r.startMonth;
+    }
+    save();
+    ui.editingId = null; ui.tab = 'overview'; ui.formType = 'single';
+    render();
+  });
+  document.getElementById('f-cancel').addEventListener('click', ()=>{
+    ui.editingId = null; ui.tab = 'overview'; ui.formType = 'single';
+    render();
+  });
+
+  updateCalc();
+}
+
+/* ================= Render: Klienter ================= */
+function renderClients(){
+  const editing = ui.editingClientId ? state.clients.find(c=>c.id===ui.editingClientId) : null;
+  let html = '<div class="card"><h2>'+(editing?'Rediger klient':'Tilføj klient')+'</h2>'+
+    '<p class="sub">En klient er den virksomhed, du sælger på vegne af. NSF-satsen er den procent af ordrebeløbet, som NSF fakturerer klienten.</p>'+
+    '<div class="grid3">'+
+      '<div class="field"><label for="c-name">Klientens navn</label>'+
+        '<input type="text" id="c-name" placeholder="Fx Acme A/S" value="'+esc(editing?editing.name:'')+'"></div>'+
+      '<div class="field"><label for="c-rate">NSF-sats (%)</label>'+
+        '<input type="number" id="c-rate" min="0" max="100" step="0.1" placeholder="Fx 5" value="'+(editing?esc(String(editing.nsfRate)):'')+'"></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:10px">'+
+      '<button class="btn primary" id="c-save">'+(editing?'Gem ændringer':'+ Tilføj klient')+'</button>'+
+      (editing?'<button class="btn" id="c-cancel">Annullér</button>':'')+
+    '</div></div>';
+
+  html += '<div class="card"><h2>Dine klienter</h2><p class="sub">'+
+    (state.clients.length ? 'Satserne bruges automatisk, når du registrerer nye salg.' : 'Ingen klienter endnu — tilføj din første ovenfor.')+'</p>';
+
+  for(const c of state.clients){
+    const count = state.sales.filter(s=>s.clientId===c.id).length;
+    html += '<div class="client-row">'+
+      '<div class="client-ic">'+esc((c.name||'?').trim().charAt(0).toUpperCase())+'</div>'+
+      '<div class="client-main"><b>'+esc(c.name)+'</b><div class="m">NSF-sats: '+esc(fmtPct(c.nsfRate))+' · '+count+' salg registreret</div></div>'+
+      '<button class="iconbtn" data-action="edit-client" data-id="'+c.id+'" title="Rediger">'+iconEdit()+'</button>'+
+      '<button class="iconbtn danger" data-action="delete-client" data-id="'+c.id+'" title="Slet">'+iconTrash()+'</button>'+
+    '</div>';
+  }
+  html += '</div>';
+  view.innerHTML = html;
+
+  document.getElementById('c-save').addEventListener('click', ()=>{
+    const name = document.getElementById('c-name').value.trim();
+    const rate = Number(document.getElementById('c-rate').value);
+    if(!name){ toast('Angiv klientens navn'); return; }
+    if(!isFinite(rate) || rate <= 0 || rate > 100){ toast('Angiv en NSF-sats mellem 0 og 100'); return; }
+    if(editing){
+      editing.name = name; editing.nsfRate = rate;
+      toast('Klienten er opdateret ✓ (gælder fremtidige salg)');
+      ui.editingClientId = null;
+    }else{
+      state.clients.push({ id: uid(), name, nsfRate: rate });
+      toast('Klienten er tilføjet ✓');
+    }
+    save(); render();
+  });
+  const cancel = document.getElementById('c-cancel');
+  if(cancel) cancel.addEventListener('click', ()=>{ ui.editingClientId = null; render(); });
+}
+
+/* ================= Render: Indstillinger ================= */
+function renderSettings(){
+  const s = state.settings;
+  const satsNow = satsAt(todayISO());
+  const next = nextTierInfo();
+  const years = employmentYearsAt(todayISO());
+
+  let satsInfo = '';
+  if(satsNow != null){
+    satsInfo = '<div class="satscard"><div class="big">'+esc(fmtPct(satsNow))+'</div><div>'+
+      '<b>Din nuværende sats</b><div class="m">'+
+      (s.satsMode==='manual' ? 'Manuelt fastsat.' :
+        (years!=null ? 'Baseret på '+years+' hele års ansættelse (0–1 år: 40% · 1–2 år: 50% · 2+ år: 60%).' : ''))+
+      (next ? ' Du rykker op til <b>'+esc(fmtPct(next.sats))+'</b> den '+fmtDate(next.date)+'.' : '')+
+      '</div></div></div>';
+  }
+
+  let html = '<div class="card"><h2>Dine oplysninger</h2>'+
+    '<p class="sub">Bruges i månedsoversigten og til at beregne dit provisionsestimat.</p>'+
+    satsInfo+
+    '<div class="grid2">'+
+      '<div class="field"><label for="s-name">Dit navn (konsulentens navn)</label>'+
+        '<input type="text" id="s-name" placeholder="Fornavn Efternavn" value="'+esc(s.name)+'"></div>'+
+      '<div class="field"><label for="s-start">Ansættelsesdato hos NSF</label>'+
+        '<input type="date" id="s-start" value="'+esc(s.startDate)+'">'+
+        '<div class="inline-note">Din sats beregnes automatisk: 0–1 år 40% · 1–2 år 50% · 2+ år 60%.</div></div>'+
+    '</div>'+
+    '<div class="field"><label>Satsberegning</label><div class="seg" id="satsSeg" style="max-width:420px">'+
+      '<button type="button" data-mode="auto" class="'+(s.satsMode==='auto'?'active':'')+'">Automatisk (anciennitet)</button>'+
+      '<button type="button" data-mode="manual" class="'+(s.satsMode==='manual'?'active':'')+'">Manuel sats</button>'+
+    '</div></div>'+
+    '<div class="field" id="manualWrap" style="display:'+(s.satsMode==='manual'?'block':'none')+';max-width:200px">'+
+      '<label for="s-manual">Din sats (%)</label>'+
+      '<input type="number" id="s-manual" min="0" max="100" step="1" value="'+esc(String(s.manualSats||''))+'"></div>'+
+    '<button class="btn primary" id="s-save">Gem indstillinger</button>'+
+  '</div>';
+
+  const snaps = readSnapshots();
+  const snapKeys = Object.keys(snaps).sort().reverse();
+  html += '<div class="card"><h2>Backup &amp; data</h2>'+
+    '<p class="sub">Alt gemmes kun lokalt i denne browser. Beregneren tager selv en daglig backup: en intern kopi i browseren (seneste 7 dage) og en backup-fil, der hentes automatisk første gang du åbner den en ny dag.</p>'+
+    '<label class="checkline" style="margin-bottom:16px"><input type="checkbox" id="s-autobk" '+(s.autoBackup!==false?'checked':'')+'> Hent automatisk en backup-fil én gang om dagen</label>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+      '<button class="btn" id="s-export">'+iconDownload()+' Eksportér sikkerhedskopi</button>'+
+      '<button class="btn" id="s-import">'+iconUpload()+' Importér sikkerhedskopi</button>'+
+      '<input type="file" id="s-file" accept="application/json" style="display:none">'+
+      '<button class="btn danger" id="s-reset">Slet alle data</button>'+
+    '</div>'+
+    (snapKeys.length ?
+      '<div class="field" style="margin-top:18px;margin-bottom:0"><label for="s-snap">Gendan fra intern sikkerhedskopi</label>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
+      '<div style="max-width:220px;flex:1"><select id="s-snap">'+
+        snapKeys.map(k=>'<option value="'+esc(k)+'">'+fmtDate(k)+(k===todayISO()?' (i dag)':'')+'</option>').join('')+
+      '</select></div>'+
+      '<button class="btn small" id="s-restore">Gendan denne dag</button></div></div>'
+      : '')+
+    '</div>';
+
+  html += '<div class="card"><h2>Gem som bogmærke</h2>'+
+    '<p class="sub">Åbn HTML-filen direkte i din browser (dobbeltklik på filen) og tryk <b>Cmd+D</b> (Mac) eller <b>Ctrl+D</b> (Windows) for at gemme den som bogmærke. Dine data er knyttet til filens placering og den browser, du bruger — så lad filen ligge samme sted, og brug samme browser hver gang. Del gerne en kopi af filen med kollegaer: de starter med en tom beregner og ser aldrig dine tal.</p></div>';
+
+  view.innerHTML = html;
+
+  document.getElementById('s-autobk').addEventListener('change', e=>{
+    s.autoBackup = e.target.checked;
+    save();
+    toast(s.autoBackup ? 'Daglig backup-fil slået til ✓' : 'Daglig backup-fil slået fra');
+  });
+  const restoreBtn = document.getElementById('s-restore');
+  if(restoreBtn) restoreBtn.addEventListener('click', ()=>{
+    const k = document.getElementById('s-snap').value;
+    const snapsNow = readSnapshots();
+    if(!snapsNow[k]){ toast('Sikkerhedskopien findes ikke længere'); return; }
+    if(!confirm('Gendan alle data som de så ud '+fmtDate(k)+'? Dine nuværende data erstattes.')) return;
+    try{
+      const d = JSON.parse(snapsNow[k]);
+      state = {
+        settings: Object.assign(defaultState().settings, d.settings||{}),
+        clients: Array.isArray(d.clients) ? d.clients : [],
+        sales: normalizeSales(Array.isArray(d.sales) ? d.sales : [])
+      };
+      save();
+      if(state.settings.theme) document.documentElement.dataset.theme = state.settings.theme;
+      toast('Data gendannet fra '+fmtDate(k)+' ✓');
+      render();
+    }catch(err){ toast('Kunne ikke gendanne sikkerhedskopien'); }
+  });
+
+  document.getElementById('satsSeg').addEventListener('click', e=>{
+    const b = e.target.closest('button[data-mode]');
+    if(!b) return;
+    document.querySelectorAll('#satsSeg button').forEach(x=>x.classList.toggle('active', x===b));
+    document.getElementById('manualWrap').style.display = b.dataset.mode==='manual' ? 'block' : 'none';
+  });
+
+  document.getElementById('s-save').addEventListener('click', ()=>{
+    s.name = document.getElementById('s-name').value.trim();
+    s.startDate = document.getElementById('s-start').value;
+    s.satsMode = document.querySelector('#satsSeg button.active').dataset.mode;
+    const m = Number(document.getElementById('s-manual').value);
+    if(s.satsMode === 'manual'){
+      if(!isFinite(m) || m <= 0 || m > 100){ toast('Angiv en gyldig manuel sats (1–100%)'); return; }
+      s.manualSats = m;
+    }
+    if(s.satsMode === 'auto' && !s.startDate){ toast('Gemt — men angiv ansættelsesdato for at se dit estimat'); save(); render(); return; }
+    save();
+    toast('Indstillingerne er gemt ✓');
+    render();
+  });
+
+  document.getElementById('s-export').addEventListener('click', ()=> downloadBackup(true));
+  document.getElementById('s-import').addEventListener('click', ()=> document.getElementById('s-file').click());
+  document.getElementById('s-file').addEventListener('change', e=>{
+    const f = e.target.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const d = JSON.parse(reader.result);
+        if(!d || typeof d !== 'object' || !Array.isArray(d.sales) || !Array.isArray(d.clients)) throw new Error('bad');
+        if(!confirm('Import erstatter alle nuværende data i denne browser. Fortsæt?')) return;
+        state = {
+          settings: Object.assign(defaultState().settings, d.settings||{}),
+          clients: d.clients, sales: normalizeSales(d.sales)
+        };
+        save();
+        if(state.settings.theme) document.documentElement.dataset.theme = state.settings.theme;
+        toast('Data importeret ✓');
+        render();
+      }catch(err){ toast('Filen kunne ikke læses — er det en gyldig sikkerhedskopi?'); }
+    };
+    reader.readAsText(f);
+    e.target.value = '';
+  });
+  document.getElementById('s-reset').addEventListener('click', ()=>{
+    if(!confirm('Er du sikker? Alle klienter, salg, indstillinger og interne sikkerhedskopier slettes permanent fra denne browser.')) return;
+    if(!confirm('Sidste chance: Har du taget en sikkerhedskopi? Tryk OK for at slette alt.')) return;
+    localStorage.removeItem(LS_KEY);
+    localStorage.removeItem(BK_KEY);
+    state = defaultState();
+    toast('Alle data er slettet');
+    ui = { tab:'overview', month: monthKeyOf(new Date()), editingId:null, editingClientId:null, formType:'single' };
+    render();
+  });
+}
+
+/* ================= Global click actions ================= */
+view.addEventListener('click', e=>{
+  const el = e.target.closest('[data-action]');
+  if(!el) return;
+  const act = el.dataset.action;
+  if(act === 'month-prev'){ ui.month = addMonths(ui.month, -1); render(); }
+  else if(act === 'month-next'){ ui.month = addMonths(ui.month, 1); render(); }
+  else if(act === 'month-today'){ ui.month = monthKeyOf(new Date()); render(); }
+  else if(act === 'goto-form'){ ui.tab = 'form'; ui.editingId = null; render(); }
+  else if(act === 'goto-clients'){ ui.tab = 'clients'; render(); }
+  else if(act === 'goto-settings'){ ui.tab = 'settings'; render(); }
+  else if(act === 'copy-month'){
+    const text = buildMonthText(ui.month);
+    copyText(text).then(ok => toast(ok ? 'Månedsoversigt kopieret — klar til indsætning ✓' : 'Kunne ikke kopiere automatisk'));
+  }
+  else if(act === 'edit-sale'){ ui.editingId = el.dataset.id; ui.tab = 'form'; render(); }
+  else if(act === 'delete-sale'){
+    const s = state.sales.find(x=>x.id===el.dataset.id);
+    if(!s) return;
+    const msg = s.type === 'retainer'
+      ? 'Slet retaineren for "'+s.customer+'"? Den fjernes fra ALLE måneder. (Tip: Sæt i stedet en slutmåned, hvis aftalen blot er stoppet.)'
+      : 'Slet salget til "'+s.customer+'"?';
+    if(!confirm(msg)) return;
+    state.sales = state.sales.filter(x=>x.id!==s.id);
+    save(); toast('Slettet'); render();
+  }
+  else if(act === 'edit-client'){ ui.editingClientId = el.dataset.id; render(); }
+  else if(act === 'delete-client'){
+    const c = state.clients.find(x=>x.id===el.dataset.id);
+    if(!c) return;
+    const used = state.sales.filter(s=>s.clientId===c.id).length;
+    const msg = used
+      ? 'Slet klienten "'+c.name+'"? De '+used+' eksisterende salg beholder deres tal, men du kan ikke oprette nye salg for klienten.'
+      : 'Slet klienten "'+c.name+'"?';
+    if(!confirm(msg)) return;
+    state.clients = state.clients.filter(x=>x.id!==c.id);
+    if(ui.editingClientId === c.id) ui.editingClientId = null;
+    save(); toast('Klienten er slettet'); render();
+  }
+});
+view.addEventListener('change', e=>{
+  const rep = e.target.closest('input[data-action="toggle-reported"]');
+  if(rep){ toggleReported(rep.dataset.id, rep.dataset.mk); return; }
+  const paid = e.target.closest('input[data-action="toggle-paid"]');
+  if(paid) togglePaid(paid.dataset.id, paid.dataset.mk);
+});
+
+/* ================= Icons ================= */
+function iconEdit(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>'; }
+function iconTrash(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>'; }
+function iconCopy(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'; }
+function iconDownload(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>'; }
+function iconUpload(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>'; }
+
+/* ================= Init ================= */
+render();
+setTimeout(dailyBackup, 800);
+</script>
+</body>
+</html>
