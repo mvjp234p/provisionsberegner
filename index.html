@@ -35,6 +35,7 @@
     --gold-soft: #f5ead2;
     --danger: #b3362b;
     --danger-soft: #f8e5e2;
+    --chart: #0b8f73;
     --shadow: 0 1px 2px rgba(29,27,23,.05), 0 8px 24px -12px rgba(29,27,23,.18);
     --shadow-lg: 0 2px 6px rgba(29,27,23,.06), 0 20px 50px -20px rgba(29,27,23,.28);
   }
@@ -54,6 +55,7 @@
     --gold-soft: #33290f;
     --danger: #e06055;
     --danger-soft: #3a1c19;
+    --chart: #12a390;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
     --shadow-lg: 0 2px 6px rgba(0,0,0,.35), 0 20px 50px -20px rgba(0,0,0,.6);
   }
@@ -271,6 +273,40 @@
   .satscard .big{ font-size: 26px; font-weight: 800; color: var(--gold); letter-spacing:-.5px; }
   .satscard .m{ font-size: 12.5px; color: var(--muted); }
 
+  /* ---------- Årsoverblik ---------- */
+  .ychart{
+    background: var(--card); border:1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px; box-shadow: var(--shadow); margin-bottom: 12px;
+  }
+  .ychart-title{ font-size: 11.5px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color: var(--muted); margin-bottom: 14px; }
+  .ybars{ display:flex; align-items:flex-end; gap: 6px; height: 130px; border-bottom: 1px solid var(--border-strong); }
+  .ybar-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; min-width:0; }
+  .ybar{ width:100%; max-width: 30px; background: var(--chart); border-radius: 4px 4px 0 0; }
+  .ybar.future{ opacity: .45; }
+  .ybar.zero{ height: 2px !important; background: var(--border-strong); border-radius: 0; }
+  .ybar-val{ font-size: 10.5px; font-weight: 700; color: var(--text); margin-bottom: 4px; white-space: nowrap; }
+  .ylabels{ display:flex; gap: 6px; margin-top: 7px; }
+  .ylabels span{ flex:1; text-align:center; font-size: 10px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing:.3px; overflow:hidden; }
+  .ychart-note{ font-size: 11.5px; color: var(--muted); margin-top: 12px; }
+  .yrow{
+    display:flex; align-items:center; gap: 12px; padding: 11px 16px;
+    background: var(--card); border:1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); cursor:pointer; transition: border-color .15s; flex-wrap:wrap;
+  }
+  .yrow:hover{ border-color: var(--accent); }
+  .yrow + .yrow{ margin-top: 8px; }
+  .yrow.dim{ opacity: .55; }
+  .yrow .ym{ width: 96px; font-weight: 700; font-size: 13.5px; text-transform: capitalize; flex:none; }
+  .yrow .yc{ font-size: 12px; color: var(--muted); width: 56px; flex:none; }
+  .yrow .ylines{ flex:1; display:flex; flex-direction:column; gap:2px; align-items:flex-end; min-width: 0; }
+  .yrow .yline{ font-size: 12.5px; white-space:nowrap; }
+  .yrow .yline b{ color: var(--muted); font-size: 11px; margin-right: 4px; }
+  .yrow .yline .est{ color: var(--accent-text); font-weight: 700; }
+  .yrow .ybadges{ flex:none; display:flex; gap:5px; }
+  @media (max-width: 920px){
+    .yrow .ylines{ align-items:flex-start; width:100%; order:3; padding-top:6px; border-top:1px dashed var(--border); }
+  }
+
   footer.foot{ text-align:center; color: var(--muted); font-size: 12px; margin-top: 34px; }
 
   /* ---------- Toast ---------- */
@@ -309,6 +345,7 @@
 
   <nav class="tabs" id="tabs">
     <button data-tab="overview">Oversigt</button>
+    <button data-tab="year">Årsoverblik</button>
     <button data-tab="form">Nyt salg</button>
     <button data-tab="clients">Klienter</button>
     <button data-tab="settings">Indstillinger</button>
@@ -316,7 +353,7 @@
 
   <main id="view"></main>
 
-  <footer class="foot">Alle data gemmes kun lokalt i din browser — del linket, ikke dine tal. · Provisionsberegner v1.1</footer>
+  <footer class="foot">Alle data gemmes kun lokalt i din browser — del linket, ikke dine tal. · Provisionsberegner v1.2</footer>
 </div>
 <div id="toast" role="status"></div>
 
@@ -363,6 +400,7 @@ let state = load();
 let ui = {
   tab: 'overview',
   month: monthKeyOf(new Date()),
+  year: new Date().getFullYear(),
   editingId: null,
   editingClientId: null,
   formType: 'single'
@@ -668,6 +706,7 @@ function render(){
   const who = document.getElementById('who');
   who.innerHTML = state.settings.name ? 'Konsulent: <b>'+esc(state.settings.name)+'</b>' : '';
   if(ui.tab === 'overview') renderOverview();
+  else if(ui.tab === 'year') renderYear();
   else if(ui.tab === 'form') renderForm();
   else if(ui.tab === 'clients') renderClients();
   else renderSettings();
@@ -831,6 +870,130 @@ function legacyCopy(text){
   try{ ok = document.execCommand('copy'); }catch(e){}
   document.body.removeChild(ta);
   return ok;
+}
+
+/* ================= Render: Årsoverblik ================= */
+function yearStats(year){
+  const months = [];
+  const totals = {}; // valuta -> {order, invoice, est, estMissing}
+  for(let m = 1; m <= 12; m++){
+    const mk = year + '-' + pad2(m);
+    const entries = entriesForMonth(mk);
+    const per = {};
+    let pendRep = 0, pendPaid = 0;
+    for(const e of entries){
+      const s = e.sale;
+      const t = per[s.currency] || (per[s.currency] = {order:0, invoice:0, est:0, estMissing:false});
+      t.order += s.amount;
+      t.invoice += invoiceOf(s);
+      const est = estimateOf(s, mk);
+      if(est) t.est += est.value; else t.estMissing = true;
+      if(!isReported(e)) pendRep++;
+      if(!isPaid(e)) pendPaid++;
+    }
+    for(const c in per){
+      const g = totals[c] || (totals[c] = {order:0, invoice:0, est:0, estMissing:false});
+      g.order += per[c].order; g.invoice += per[c].invoice; g.est += per[c].est;
+      if(per[c].estMissing) g.estMissing = true;
+    }
+    months.push({ mk, m, count: entries.length, per, pendRep, pendPaid });
+  }
+  return { months, totals };
+}
+
+function renderYear(){
+  const year = ui.year;
+  const { months, totals } = yearStats(year);
+  const curs = Object.keys(totals).sort();
+  const nowMk = monthKeyOf(new Date());
+  const totalCount = months.reduce((a,mo)=>a+mo.count, 0);
+  const pendRepYear = months.reduce((a,mo)=>a+mo.pendRep, 0);
+  const pendPaidYear = months.reduce((a,mo)=>a+mo.pendPaid, 0);
+
+  let html = '<div class="monthbar"><div class="monthnav">'+
+    '<button class="navbtn" data-action="year-prev" title="Forrige år">‹</button>'+
+    '<div class="mlabel">'+year+'</div>'+
+    '<button class="navbtn" data-action="year-next" title="Næste år">›</button>'+
+    '<button class="btn small" data-action="year-today" style="margin-left:6px">I år</button>'+
+    '</div>'+
+    '<span class="chip">'+totalCount+' salg i '+year+'</span></div>';
+
+  function valLines(key){
+    if(curs.length === 0) return '<div class="sval">–</div>';
+    return curs.map(c=>{
+      const t = totals[c];
+      if(key === 'est'){
+        if(t.estMissing && t.est === 0) return '<div class="sval">–<small>'+esc(c)+'</small></div>';
+        return '<div class="sval">'+esc(fmtNum(t.est))+'<small>'+esc(c)+(t.estMissing?' *':'')+'</small></div>';
+      }
+      return '<div class="sval">'+esc(fmtNum(t[key]))+'<small>'+esc(c)+'</small></div>';
+    }).join('');
+  }
+  html += '<div class="stats">'+
+    '<div class="stat"><div class="slabel">Ordrebeløb i '+year+'</div>'+valLines('order')+'</div>'+
+    '<div class="stat"><div class="slabel">Fakturabeløb (NSF) i '+year+'</div>'+valLines('invoice')+'</div>'+
+    '<div class="stat estimate"><div class="slabel">Estimeret provision i '+year+'</div>'+valLines('est')+
+      '<div class="snote">Hele året medregnet — også kommende måneder for løbende retainere.</div></div>'+
+    '</div>';
+
+  if(totalCount === 0){
+    html += '<div class="empty"><div class="big">📅</div>Ingen salg i '+year+'.</div>';
+    view.innerHTML = html;
+    return;
+  }
+
+  if(pendRepYear || pendPaidYear){
+    html += '<div class="statusline">'+
+      '<span class="chip '+(pendRepYear?'warn':'ok')+'">'+(pendRepYear ? pendRepYear+' indberetninger udestår i '+year : '✓ Alt indberettet')+'</span>'+
+      '<span class="chip '+(pendPaidYear?'warn':'ok')+'">'+(pendPaidYear ? pendPaidYear+' udbetalinger udestår i '+year : '✓ Alt udbetalt')+'</span></div>';
+  }
+
+  // Søjlediagram pr. valuta: estimeret provision pr. måned (fakturabeløb hvis sats mangler)
+  for(const c of curs){
+    const estVals = months.map(mo => mo.per[c] ? mo.per[c].est : 0);
+    const useInvoice = estVals.every(v => v === 0) && totals[c].estMissing;
+    const series = useInvoice ? months.map(mo => mo.per[c] ? mo.per[c].invoice : 0) : estVals;
+    const max = Math.max.apply(null, series);
+    const maxIdx = series.indexOf(max);
+    html += '<div class="ychart">'+
+      '<div class="ychart-title">'+(useInvoice ? 'Fakturabeløb (NSF)' : 'Estimeret provision')+' pr. måned · '+esc(c)+'</div>'+
+      '<div class="ybars">'+ months.map((mo, i)=>{
+        const v = series[i];
+        const hPct = max > 0 && v > 0 ? Math.max(4, Math.round(v / max * 100)) : 0;
+        const future = mo.mk > nowMk;
+        const title = MONTHS_DA[i]+' '+year+': '+fmtNum(v)+' '+c+(future ? ' (kommende)' : '');
+        return '<div class="ybar-col" title="'+esc(title)+'">'+
+          (i === maxIdx && v > 0 ? '<span class="ybar-val">'+esc(fmtNum(v))+'</span>' : '')+
+          '<div class="ybar'+(v > 0 ? '' : ' zero')+(future ? ' future' : '')+'" style="height:'+hPct+'%"></div></div>';
+      }).join('')+'</div>'+
+      '<div class="ylabels">'+MONTHS_DA.map(n=>'<span>'+n.slice(0,3)+'</span>').join('')+'</div>'+
+      '<div class="ychart-note">Nedtonede søjler er kommende måneder. Hold musen over en søjle for at se tallet — klik på en måned herunder for detaljer.</div></div>';
+  }
+
+  // Måned for måned
+  for(const mo of months){
+    const has = mo.count > 0;
+    let lines;
+    if(has){
+      lines = Object.keys(mo.per).sort().map(c=>{
+        const t = mo.per[c];
+        const estTxt = (t.estMissing && t.est === 0) ? '–' : fmtNum(t.est);
+        return '<div class="yline"><b>'+esc(c)+'</b>Ordre '+esc(fmtNum(t.order))+' · Faktura '+esc(fmtNum(t.invoice))+' · <span class="est">Estimat '+esc(estTxt)+'</span></div>';
+      }).join('');
+    }else{
+      lines = '<div class="yline" style="color:var(--muted)">Ingen salg</div>';
+    }
+    const badges =
+      (has && mo.pendRep ? '<span class="badge retainer">'+mo.pendRep+' uindberettet</span>' : '')+
+      (has && mo.pendPaid ? '<span class="badge single">'+mo.pendPaid+' uudbetalt</span>' : '');
+    html += '<div class="yrow'+(has?'':' dim')+'" data-action="year-goto-month" data-mk="'+mo.mk+'" title="Klik for at åbne '+esc(monthLabel(mo.mk))+'">'+
+      '<div class="ym">'+esc(MONTHS_DA[mo.m-1])+'</div>'+
+      '<div class="yc">'+(has ? mo.count+' salg' : '')+'</div>'+
+      '<div class="ybadges">'+badges+'</div>'+
+      '<div class="ylines">'+lines+'</div>'+
+    '</div>';
+  }
+  view.innerHTML = html;
 }
 
 /* ================= Render: Salgsformular ================= */
@@ -1289,6 +1452,10 @@ view.addEventListener('click', e=>{
   if(act === 'month-prev'){ ui.month = addMonths(ui.month, -1); render(); }
   else if(act === 'month-next'){ ui.month = addMonths(ui.month, 1); render(); }
   else if(act === 'month-today'){ ui.month = monthKeyOf(new Date()); render(); }
+  else if(act === 'year-prev'){ ui.year--; render(); }
+  else if(act === 'year-next'){ ui.year++; render(); }
+  else if(act === 'year-today'){ ui.year = new Date().getFullYear(); render(); }
+  else if(act === 'year-goto-month'){ ui.month = el.dataset.mk; ui.tab = 'overview'; render(); }
   else if(act === 'goto-form'){ ui.tab = 'form'; ui.editingId = null; render(); }
   else if(act === 'goto-clients'){ ui.tab = 'clients'; render(); }
   else if(act === 'goto-settings'){ ui.tab = 'settings'; render(); }
