@@ -353,7 +353,7 @@
 
   <main id="view"></main>
 
-  <footer class="foot">Alle data gemmes kun lokalt i din browser — del linket, ikke dine tal. · Provisionsberegner v1.2</footer>
+  <footer class="foot">Alle data gemmes kun lokalt i din browser — del linket, ikke dine tal. · Provisionsberegner v1.3</footer>
 </div>
 <div id="toast" role="status"></div>
 
@@ -498,10 +498,13 @@ function invoiceOf(sale){
   if(sale.invoiceOverride != null && isFinite(sale.invoiceOverride)) return sale.invoiceOverride;
   return round2(sale.amount * sale.nsfRate / 100);
 }
-/* Estimat for et salg i en given måned (mk bruges kun for retainere) */
+/* Estimat for et salg i en given måned (mk bruges kun for retainere).
+   Et salg kan have sin egen sats (satsOverride) — fx en særlig kundeaftale. */
 function estimateOf(sale, mk){
   const refDate = sale.type === 'single' ? sale.date : (mk + '-01');
-  const sats = satsAt(refDate);
+  const sats = (sale.satsOverride != null && isFinite(sale.satsOverride))
+    ? sale.satsOverride
+    : satsAt(refDate);
   if(sats == null) return null;
   return { sats, value: round2(invoiceOf(sale) * sats / 100) };
 }
@@ -796,10 +799,11 @@ function renderOverview(){
       const typeBadge = s.type === 'single'
         ? '<span class="badge single">Enkeltsalg</span>'
         : '<span class="badge retainer">Retainer</span>';
-      const sub = s.type === 'single'
+      const ownSats = s.satsOverride != null ? ' · egen sats '+esc(fmtPct(s.satsOverride)) : '';
+      const sub = (s.type === 'single'
         ? 'Solgt for '+esc(s.clientName)+' · '+fmtDate(s.date)+' · NSF-sats '+esc(fmtPct(s.nsfRate))
         : 'Solgt for '+esc(s.clientName)+' · bekræftet '+fmtDate(s.date)+' · '+esc(monthLabel(mk))+' · NSF-sats '+esc(fmtPct(s.nsfRate))+
-          (s.endMonth ? ' · slutter '+esc(monthLabel(s.endMonth)) : ' · løbende');
+          (s.endMonth ? ' · slutter '+esc(monthLabel(s.endMonth)) : ' · løbende')) + ownSats;
       html += '<div class="entry'+((rep&&paid)?' reported':'')+'">'+
         '<div class="chks">'+
         '<label class="chkwrap" title="Markér som indberettet til bogholder"><input type="checkbox" data-action="toggle-reported" data-id="'+s.id+'" data-mk="'+mk+'" '+(rep?'checked':'')+'><span>Indberettet</span></label>'+
@@ -1038,6 +1042,7 @@ function renderForm(){
     currency: editing ? editing.currency : (state.settings.lastCurrency || 'DKK'),
     description: editing ? (editing.description||'') : '',
     invoiceOverride: editing ? editing.invoiceOverride : null,
+    satsOverride: editing && editing.satsOverride != null ? editing.satsOverride : null,
     startMonth: editing && editing.startMonth ? editing.startMonth : monthKeyOf(now),
     endMonth: editing ? editing.endMonth : null
   };
@@ -1083,6 +1088,11 @@ function renderForm(){
       '<input type="text" inputmode="decimal" id="f-invoice" placeholder="Fakturabeløb" value="'+(v.invoiceOverride!=null?esc(String(v.invoiceOverride).replace('.',',')):'')+'">'+
       '<div class="inline-note">Brug kun hvis NSF’s faktura afviger fra standard-satsen.</div></div></div>'+
 
+    '<div class="field"><label class="checkline"><input type="checkbox" id="f-sats-manual" '+(v.satsOverride!=null?'checked':'')+'> Egen sats for dette salg</label>'+
+      '<div id="f-sats-wrap" style="display:'+(v.satsOverride!=null?'block':'none')+';margin-top:8px;max-width:200px">'+
+      '<input type="number" id="f-sats" min="0" max="100" step="0.5" placeholder="Fx 45" value="'+(v.satsOverride!=null?esc(String(v.satsOverride)):'')+'">'+
+      '<div class="inline-note">Bruges i stedet for din normale sats — fx når aftalen afhænger af kunden'+(type==='retainer'?' (gælder alle retainerens måneder)':'')+'.</div></div></div>'+
+
     '<div class="field"><label for="f-desc">Beskrivelse (frivillig)</label>'+
       '<textarea id="f-desc" placeholder="Fx aftaledetaljer til bogholderen">'+esc(v.description)+'</textarea></div>'+
 
@@ -1123,8 +1133,13 @@ function renderForm(){
     document.getElementById('f-inv-wrap').style.display = invManual.checked ? 'block' : 'none';
     updateCalc();
   });
+  const satsManual = document.getElementById('f-sats-manual');
+  satsManual.addEventListener('change', ()=>{
+    document.getElementById('f-sats-wrap').style.display = satsManual.checked ? 'block' : 'none';
+    updateCalc();
+  });
 
-  ['f-client','f-customer','f-date','f-currency','f-amount','f-invoice','f-desc','f-start-m','f-start-y','f-end-m','f-end-y'].forEach(id=>{
+  ['f-client','f-customer','f-date','f-currency','f-amount','f-invoice','f-sats','f-desc','f-start-m','f-start-y','f-end-m','f-end-y'].forEach(id=>{
     const el = document.getElementById(id);
     if(el){ el.addEventListener('input', updateCalc); el.addEventListener('change', updateCalc); }
   });
@@ -1141,6 +1156,8 @@ function renderForm(){
     const amount = parseAmount(document.getElementById('f-amount').value);
     const manual = document.getElementById('f-inv-manual').checked;
     const invRaw = manual ? parseAmount(document.getElementById('f-invoice').value) : NaN;
+    const satsManualOn = document.getElementById('f-sats-manual').checked;
+    const satsRaw = satsManualOn ? Number(document.getElementById('f-sats').value) : NaN;
     const r = {
       clientId: clientSel, clientName, nsfRate,
       customer: document.getElementById('f-customer').value.trim(),
@@ -1148,6 +1165,7 @@ function renderForm(){
       currency: document.getElementById('f-currency').value,
       amount,
       invoiceOverride: manual && isFinite(invRaw) ? round2(invRaw) : null,
+      satsOverride: satsManualOn && isFinite(satsRaw) && satsRaw > 0 && satsRaw <= 100 ? satsRaw : null,
       description: document.getElementById('f-desc').value.trim(),
       type
     };
@@ -1166,14 +1184,14 @@ function renderForm(){
     const ok = isFinite(r.amount) && r.amount > 0 && isFinite(r.nsfRate);
     const invoice = ok ? (r.invoiceOverride != null ? r.invoiceOverride : round2(r.amount * r.nsfRate / 100)) : null;
     const refDate = type === 'single' ? (r.date || todayISO()) : ((r.startMonth || monthKeyOf(new Date())) + '-01');
-    const sats = satsAt(refDate);
+    const sats = r.satsOverride != null ? r.satsOverride : satsAt(refDate);
     const est = (invoice != null && sats != null) ? round2(invoice * sats / 100) : null;
     const per = type === 'retainer' ? ' / md.' : '';
     let h = '<h3>Beregning</h3>';
     h += '<div class="calcrow"><span class="cl">Ordrebeløb'+(type==='retainer'?' pr. måned':'')+'</span><span class="cv">'+(ok?esc(fmtMoney(r.amount, r.currency)):'–')+'</span></div>';
     h += '<div class="calcrow"><span class="cl">NSF-sats ('+esc(r.clientName||'klient')+')</span><span class="cv">'+(isFinite(r.nsfRate)?esc(fmtPct(r.nsfRate)):'–')+'</span></div>';
     h += '<div class="calcrow sep"><span class="cl">Fakturabeløb (NSF)'+(r.invoiceOverride!=null?' · manuelt':'')+'</span><span class="cv">'+(invoice!=null?esc(fmtMoney(invoice, r.currency))+per:'–')+'</span></div>';
-    h += '<div class="calcrow"><span class="cl">Din sats</span><span class="cv">'+(sats!=null?esc(fmtPct(sats)):'ikke sat')+'</span></div>';
+    h += '<div class="calcrow"><span class="cl">Din sats'+(r.satsOverride!=null?' · egen for salget':'')+'</span><span class="cv">'+(sats!=null?esc(fmtPct(sats)):'ikke sat')+'</span></div>';
     h += '<div class="calcrow total"><span class="cl">Estimeret provision</span><span class="cv">'+(est!=null?esc(fmtMoney(est, r.currency))+per:'–')+'</span></div>';
     if(type === 'retainer' && r.endMonth && r.startMonth && r.endMonth >= r.startMonth && est != null){
       const [sy,sm] = r.startMonth.split('-').map(Number);
@@ -1193,6 +1211,7 @@ function renderForm(){
     if(!r.customer){ toast('Angiv hvilken kunde der er solgt til'); return; }
     if(!r.date){ toast('Angiv dato for salget/bekræftelsen'); return; }
     if(!isFinite(r.amount) || r.amount <= 0){ toast('Angiv et gyldigt ordrebeløb'); return; }
+    if(document.getElementById('f-sats-manual').checked && r.satsOverride == null){ toast('Angiv en gyldig egen sats (1–100%)'); return; }
     if(type === 'retainer' && r.endMonth && r.endMonth < r.startMonth){ toast('Slutmåneden ligger før første måned'); return; }
 
     state.settings.lastCurrency = r.currency;
